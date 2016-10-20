@@ -1,0 +1,96 @@
+<html>
+<head>
+<style>
+body {
+	font: 85% helvtica, sans-serif;
+}
+#chatWindow {
+	width: 100%;
+	border-bottom: 1px solid #eee;
+}
+#chatWindow .entry {
+	padding: 2px;
+}
+#chatWindow .entry .timestamp {
+	font-size: 80%;
+	color: #999;
+}
+#chatWindow .entry .username {
+	display: inline-block;
+	width: 100px;
+	text-align: right;
+	font-weight: bold;
+}
+transient .chatEntry {
+	color: #a00;
+}
+</style>
+<script>
+webstrate.on("loaded", function(webstrateId, clientId, user) {
+	var userName = prompt("Enter name:", "Anonymous");
+	var chatWindow = document.getElementById("chatWindow");
+	var recipientBox = document.createElement("transient");
+	recipientBox.setAttribute("id", "recipientBox");
+	var inputField = document.getElementById("inputField");
+	var submitButton = document.getElementById("submitButton");
+
+	document.body.insertBefore(recipientBox, inputField);
+
+	submitButton.addEventListener("click", function() {
+		var recipientId = recipientBox.getAttribute("clientid");
+		var recipient = recipientBox.innerText;
+		var timestamp = new Date().toISOString().substr(11,8);
+
+		if (recipientId) {
+			chatWindow.webstrate.signal({ userName: userName, text: inputField.value }, [recipientId]);
+			chatWindow.insertAdjacentHTML('beforeend', '<transient>' +
+				'<div class="private chatEntry" ' +
+				'title="clientId: ' + clientId +'" clientid="' + clientId + '">' +
+					'<span class="timestamp">' + timestamp + '</span> ' +
+					'<span class="username">To: ' + recipient + '</span>: ' +
+					'<span class="message">' + inputField.value + '</span>' +
+				'</div>' +
+			'</transient>\n');
+		} else {
+			chatWindow.insertAdjacentHTML('beforeend', '<div class="chatEntry" ' +
+				'title="clientId: ' + clientId + '" clientid="' + clientId + '">' +
+				'<span class="timestamp">' + timestamp + '</span> ' +
+				'<span class="username">' + userName + '</span>: ' +
+				'<span class="message">' + inputField.value + '</span>' +
+			'</div>\n');
+		}
+		inputField.value = "";
+	});
+
+	chatWindow.addEventListener("dblclick", function(e) {
+		if (e.target.className === "username") {
+			recipientBox.setAttribute("clientid", e.target.parentElement.getAttribute("clientid"));
+			recipientBox.innerText = e.target.parentElement.querySelector(".username").innerText;
+		} else {
+			recipientBox.removeAttribute("clientid");
+			recipientBox.innerText = "";
+		}
+	});
+
+	chatWindow.webstrate.on("signal", function(message, senderId, node) {
+		var timestamp = new Date().toISOString().substr(11,8);
+		chatWindow.insertAdjacentHTML('beforeend', '<transient>' +
+			'<div class="private chatEntry" ' +
+			'title="clientId: ' + senderId + '" clientid="' + senderId + '">' +
+				'<span class="timestamp">' + timestamp + '</span> ' +
+				'<span class="username">From: ' + message.userName + '</span>: ' +
+				'<span class="message">' + message.text + '</span>' +
+			'</div>' +
+		'</transient>\n');
+	});
+});
+</script>
+</head>
+<body>
+<div id="chatWindow">
+
+</div>
+<input type="text" id="inputField">
+<button id="submitButton">Submit</button>
+</body>
+</html>
