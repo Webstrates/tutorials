@@ -1,0 +1,160 @@
+<html>
+<head>
+	<style>
+	html, body {
+		margin: 0;
+		height: 100%;
+	}
+	body {
+		font: 85% helvetica;
+		background: #eee;
+	}
+	#flexContainer {
+		height: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: stretch;
+	}
+	#docListContainer, #docContainer, #tagTableContainer {
+		flex-direction: column;
+		padding: 0 5px;
+	}
+	#docListContainer {
+		width: 150px;
+	}
+	#tagTableContainer {
+		max-width: 250px;
+	}
+	#docContainer {
+		flex-grow: 1;
+	}
+	#tagTable td:nth-child(1) {
+		padding-right: 10px;
+	}
+	#docList li, #tagTable td {
+		cursor: pointer;
+		color: #22a;
+	}
+	#docList li:hover, #tagTable tr:hover {
+		background: #fff;
+	}
+	#docIframe {
+		background: #fff;
+		width: 100%;
+		height: 100%;
+		border: 0;
+	}
+	#tagTableContainer td:nth-child(2) {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		float: left;
+		width: 220px;
+	}
+	#tagTable {
+		border-collapse: collapse;
+	}
+	</style>
+	<script type="text/javascript" charset="utf-8">
+	webstrate.on("loaded", function(webstrateId) {
+		var docNameInput = document.getElementById("docNameInput");
+		var docAddButton = document.getElementById("docAddButton");
+		var docList = document.getElementById("docList");
+		var docContainer = document.getElementById("docContainer");
+		var docIframe;
+
+		var tagTableContainer = document.getElementById("tagTableContainer");
+		var tagTable = document.createElement("table");
+		tagTable.setAttribute("id", "tagTable");
+		var tagTableTransient = document.createElement("transient");
+		tagTableTransient.appendChild(tagTable);
+		tagTableContainer.appendChild(tagTableTransient);
+
+		function showDocument(docName) {
+			docIframe = document.createElement("iframe");
+			docIframe.setAttribute("src", webstrateId + "-" + docName);
+			docIframe.setAttribute("id", "docIframe");
+			var docIframeTransient = document.createElement("transient");
+			docIframeTransient.appendChild(docIframe);
+			docContainer.innerHTML = "";
+			docContainer.appendChild(docIframeTransient);
+			docIframe.webstrate.on("transcluded", function(iframeWebstrateId) {
+				updateTags(docIframe.contentWindow.webstrate.tags());
+				docIframe.contentWindow.webstrate.on("tag", function() {
+					updateTags(docIframe.contentWindow.webstrate.tags());
+				});
+			});
+
+			if (!document.getElementById("tagNameInput")) {
+				var tagNameInput = document.createElement("input");
+				tagNameInput.setAttribute("type", "text");
+				tagNameInput.setAttribute("placeholder", "Tag...");
+				tagNameInput.setAttribute("id", "tagNameInput");
+				tagTableTransient.appendChild(tagNameInput);
+
+				var tagAddButton = document.createElement("button");
+				tagAddButton.innerHTML = "Add";
+				tagTableTransient.appendChild(tagAddButton);
+				tagAddButton.addEventListener("click", function() {
+					if (!tagNameInput.value) return;
+
+					docIframe.contentWindow.webstrate.tag(tagNameInput.value);
+					tagNameInput.value = "";
+				});
+			}
+		}
+
+		function updateTags(tags) {
+			tagTable.innerHTML = "";
+			Object.keys(tags).forEach(function(version) {
+				tagTable.insertAdjacentHTML("beforeend",
+					`<tr><td>${version}</td><td>${tags[version]}</td></tr>`);
+			})
+		}
+
+		docAddButton.addEventListener("click", function() {
+			if (!docNameInput.value) return;
+
+			var docName = docNameInput.value;
+			docList.insertAdjacentHTML("beforeend", `<li>${docName}</li>`);
+			showDocument(docName);
+			docIframe.webstrate.on("transcluded", function(iframeWebstrateId) {
+				if (!docIframe.contentDocument.body.getAttribute("contenteditable")) {
+					docIframe.contentDocument.body.innerHTML = `<h1>${docName}</h1>`;
+					docIframe.contentDocument.body.setAttribute("contenteditable", "");
+				}
+			});
+			docNameInput.value = "";
+		});
+
+		docList.addEventListener("click", function(ev) {
+			if (ev.target.tagName.toLowerCase() !== "li") return;
+
+			var docName = ev.target.innerText;
+			showDocument(docName);
+		});
+
+		tagTable.addEventListener("click", function(ev) {
+			if (!ev.target.closest("tr")) return;
+
+			var version = parseInt(ev.target.closest("tr").children[0].innerText);
+			docIframe.contentWindow.webstrate.restore(version);
+		});
+	});
+	</script>
+</head>
+<body>
+<div id="flexContainer">
+	<div id="docListContainer">
+		<h2>Documents</h2>
+		<ol id="docList"></ol>
+		<input id="docNameInput" type="text" placeholder="Name..."/>
+		<button id="docAddButton">Add</button>
+	</div>
+	<div id="docContainer"></div>
+	<div id="tagTableContainer">
+		<h2>Tags</h2>
+	</div>
+</div>
+</body>
+</html>

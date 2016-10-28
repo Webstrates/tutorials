@@ -1,6 +1,9 @@
-# Let's create a chat system!
+Chat System Tutorial
+====================
 
 First, you should create a new Webstrate, so we can get started.
+
+# 1. Basic chat
 
 A chat system needs a chat window, an input field, and a submit button. Let's add that to the body
 of our Webstrate:
@@ -41,12 +44,12 @@ webstrate.on("loaded", function(webstrateId, clientId, user) {
 </script>
 ```
 
-> **Side note** You might rightfully wonder why we are using something as obscure as
+> **Sidenote:** You might rightfully wonder why we are using something as obscure as
 > `insertAdjacentHTML` instead of just appending to `innerHTML`. Changing `innerHTML` causes the
 > entire body of the parent to be removed and reinserted. This would not only be a lot of
 > unnecessary work for a system that transmits all changes made directly to the server, and
 > indirectly to all connected clients, but it will also break message order later on when we start
-> using the `<transient` tag.
+> using the [`<transient>`](//github.com/Webstrates/Webstrates#transient-data) tag.
 >
 > While it's necessary to do with Webstrates, it's also good practice to do in general, as it will be
 > a lot more performant than fiddling with `innerHTML`.
@@ -54,6 +57,8 @@ webstrate.on("loaded", function(webstrateId, clientId, user) {
 To test it out, reload the page, write something in the input field and press the submit button. The
 page needs to be reloaded, because the JavaScript isn't reinterpreted until the page gets reloaded.
 Imagine what a mess that would be if every little change caused the entire script to run again.
+
+# 2. Adding meta information
 
 Great! Now we have a rudimentary chat system, but we can't see who's writing what or when. We can
 ask for the user's name using a `prompt`, and also add a timestamp to each message. By now, the
@@ -110,13 +115,14 @@ body {
 </style>
 ```
 
-## Private messaging
+# 3. Private messaging
 
 If we want to add private messaging, we will have to rely on some other Webstrate mechanics. If
 private messages were just added to the DOM as well, they wouldn't be very private.
 
-Instead, we will send messages using signaling and show them using transient elements. Signaling
-allows users to send messages on DOM elements to (a subset of) all users.
+Instead, we will send messages using [signaling](//github.com/Webstrates/Webstrates#signaling)
+and show them using transient elements. Signaling allows users to send messages on DOM elements
+to (a subset of) all users.
 
 Transient elements are DOM elements that are not being persisted, and thus are private to the
 individual users.

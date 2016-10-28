@@ -1,0 +1,54 @@
+<html>
+<head>
+	<style id="style-main">
+	body {
+		width: 400px;
+		margin-left: auto;
+		margin-right: auto;
+		text-align: center;
+	}
+	#input {
+		width: 100%;
+		min-height: 400px;
+		background-color: rgb(255, 255, 150);
+		text-align: left;
+		box-shadow: 5px 5px 10px gray;
+		font-size: 24pt;
+		word-wrap: break-word;
+		padding: 16px;
+	}
+	button {
+	margin-top: 1em;
+		font-size: 20pt;
+	}
+	</style>
+	<script id="script-main">webstrate.on("loaded", function() {
+		var iframe = document.getElementById("notes");
+		// Wait for the transcluded webstrate to finish loading.
+		iframe.webstrate.on("transcluded", function() {
+			// Get a reference to the document of the transcluded webstrate.
+			var innerDoc = iframe.contentWindow.document;
+
+			// Install an event listener on the submit button.
+			document.getElementById("submit").addEventListener("click", function() {
+				var input = document.getElementById("input");
+
+				// Create a new note.
+				var newNote = innerDoc.createElement("div");
+				newNote.setAttribute("class", "note");
+				newNote.innerHTML = input.innerHTML;
+
+				// Add the new note to the body of the transcluded webstrate.
+				innerDoc.body.appendChild(newNote);
+				input.innerHTML = "";
+			});
+		});
+	});
+	</script>
+</head>
+<body>
+	<div id="input" contenteditable="true"></div>
+	<button id="submit">Submit note</button>
+	<iframe id="notes" src="/shared_notes" style="display: none;"></iframe>
+</body>
+</html>
