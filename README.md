@@ -9,6 +9,8 @@ transclusion.
 [signaling](//github.com/Webstrates/Webstrates#signaling).
 3. **[Notebook](notebook)** A notebook also utilizing `<transient>` tags, transclusion, as well as
 [tagging](//github.com/Webstrates/Webstrates#tagging).
+4. **[Pad](pad)** A basic implementation of a zoomable canvas utilizing `external webstrates` and
+other features introduced in previous tutorials.
 
 It is highly recommended that you start out with [Collaborative Notes](/collaborative-notes), as it
 also introduces some useful tools for developing Webstrates.
