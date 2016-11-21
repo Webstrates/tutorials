@@ -1,821 +1,1289 @@
 Pad Tutorial
 =================
 
-In this tutorial, we will create an infinite canvas. The canvas allows panning, rotation,
-and zooming. You can draw on the canvas using an Apple Pen (other stylus devices will be
-supported in future). It also allows to add images or add markdown notes to it. 
-
->**Attention:** This tutorial will use the concept of [external webstrates](https://github.com/Webstrates/common-libs/tree/dev).
->External webstrates can be seen as documents loaded into a document similar to external
-scripts (e.g., *.js) or external stylesheets (e.g., *.css). 
+In this tutorial, we will create an infinite canvas or pad. The pad allows panning, rotation,
+and zooming. You can draw on the pad using an Apple Pen (other stylus devices will be supported
+in future). We will further add a tool to add pictures. 
 
 # 1. Getting started
 
-Create a new webstrate document (e.g., `/my-pad`) with the following html. This document will henceforth be
-referred as `Pad Document`. The document adds the `Babel` library, which will transform scripts
-into ES2015 compatible JavaScript code. Babel is required to use ES6 `class` constructs together with
-WebKit devices. In this tutorial, we will use classes and therefore the Babel library is necessary.
+Create a new webstrate document (e.g., `/pad.html`) with the following html. The document adds
+the `Babel` library, which will transform ES6 scripts into ES2015 compatible JavaScript code.
+Babel is required to use ES6 together with WebKit devices.
 
 ```html
 <html>
 <head>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
     <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
-    <!-- Webstrates External Script/Stylesheet Bootstrap -->
-    <script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js"></script>
 
     <style type="text/css">
         html,
         body {
             margin: 0;
             padding: 0;
+        }
+        
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: deepskyblue;
+        }
+        
+        #canvas {
             width: 100%;
             height: 100%;
-            overflow: hidden;
+            box-shadow: none;
+            overflow: visible;
         }
-
-        #content {
+        
+        #canvas>svg {
+            overflow: visible;
+        }
+        
+        svg.drawing-canvas {
+            position: absolute;
             width: 100%;
             height: 100%;
-            display: -webkit-flex;
-            display: flex;
+            z-index: 1;
+            pointer-events: none;
         }
-
-        #content > div {
-            margin: 20px;
-            width: 100%;
-            box-shadow:  0px 0px 15px black;
-            overflow: hidden;
-
-            /* svg does not work with border-radius. Therefore a padding of 2px to move svg 2px inwards. */
-            padding: 2px;
-            border-radius: 2px;
-
-            /* DEBUG COLOR */
-            background: orange;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            min-height: 100%;            
-            border: none;
-            overflow: hidden;
-
-            /* DEBUG COLOR */
-            background-color: saddlebrown;
+        
+        #canvas>svg.drawing-canvas {
+            width: 1px;
+            height: 1px;
+            overflow: visible;
         }
     </style>
-    <script type="text/javascript">
-        webstrate.on("loaded", function(webstrateId) {
-            const iframe = document.querySelector('#padsheet');
-
-            // Create a padsheet on first load named <webstrate>_sheet.
-            if (!iframe.src) {
-                iframe.src = '/' + webstrateId + '_sheet';
-            }
-        });
-    </script>
 </head>
 <body>
-    <div id="content">
-        <iframe id="padsheet"></iframe>
-    </div>
+    <div id="canvas"></div>
 </body>
 </html>
 ```
 
 Open the webstrate in a browser or reload the page if you have it already open in a browser.
-Don't worry if the browser renders a page with a `saddlebrown` background. That is actually
-intentional. Also, it should have generated a new webstrate `<webstrateId>_sheet` (e.g., `my-pad_sheet`)
-and set it as the `iframe#padsheet` src. This padsheet will actually be our canvas on which we draw and
-to which we can add notes and images. Henceforth, we use padsheet and canvas interchangeably.
+Don't worry if the browser renders a page with a `deepskyblue` background. That is actually
+intentional for debugging to see if the webstrate is updated properly.
 
-# 2. Add basics
-
-In order to make the canvas/padsheet interactive, this tutorial relies on `hammer.js` and our `transformer.js`
-APIs. We further provide a `pad.js` library that augments the padsheet with additional html
-markup and serves as base class to add plugins like `CanvasInteraction`. Add the following
-`<wscript>` elements to the `<head>` of your document but below the Babel and external webstrates
-scripts.
+# 2. Add tool palette for instruments
 
 ```html
-<!-- Pad Canvas Libraries -->
-<wscript type="webstrate/javascript" src="/pad.js"></wscript>
-<wscript type="webstrate/javascript" src="/pad.manipulation-behavior.js"></wscript>
-<wscript type="webstrate/javascript" src="/pad.plugin.canvas-interaction.js"></wscript>
-<wscript type="webstrate/javascript" src="/pad.plugin.canvas-object-interaction.js"></wscript>
-<wscript type="webstrate/javascript" src="/pad.plugin.canvas-drawing.js"></wscript>
-<wscript type="webstrate/javascript" src="/pad.plugin.image-box.js"></wscript>
+<!-- Create Transient Tool Palette -> instrument scripts will add tools to this tool palette -->
+<script type="text/javascript">
+    webstrate.on("loaded", function() {
+        var toolPalette = document.createElement("transient");
+        toolPalette.setAttribute("id", "tool-palette");
+        document.body.appendChild(toolPalette);
+    });
+</script>
+
+<!-- Add instrument scripts here -->
 ```
 
->**Attention:** Due to a potential bug in the external webstrates library make sure to always replace
->the entire `Pad Document` with the new document markup. Otherwise the `Pad Document` will eventually have two
->`<body>` elements and break.
-
-## This is the complete `Pad Document` after step 2.
-
-```html
-<html>
-<head>
-    <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
-    <!-- Webstrates External Script/Stylesheet Bootstrap -->
-    <script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js"></script>
-
-    <wscript type="webstrate/javascript" src="/transformer-stable.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer-time.min.js"></wscript>
-
-    <!-- Pad Canvas Libraries -->
-    <wscript type="webstrate/javascript" src="/pad.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.manipulation-behavior.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-object-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-drawing.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.image-box.js"></wscript>
-
-    <style type="text/css">
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        #content {
-            width: 100%;
-            height: 100%;
-            display: -webkit-flex;
-            display: flex;
-        }
-
-        #content > div {
-            margin: 20px;
-            width: 100%;
-            box-shadow:  0px 0px 15px black;
-            overflow: hidden;
-
-            /* svg does not work with border-radius. Therefore a padding of 2px to move svg 2px inwards. */
-            padding: 2px;
-            border-radius: 2px;
-
-            /* DEBUG COLOR */
-            background: orange;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            min-height: 100%;            
-            border: none;
-            overflow: hidden;
-
-            /* DEBUG COLOR */
-            background-color: saddlebrown;
-        }
-    </style>
-    <script type="text/javascript">
-        webstrate.on("loaded", function(webstrateId) {
-            const iframe = document.querySelector('#padsheet');
-
-            // Create a padsheet on first load named <webstrate>_sheet.
-            if (!iframe.src) {
-                iframe.src = '/' + webstrateId + '_sheet';
-            }
-        });
-    </script>
-</head>
-<body>
-    <div id="content">
-        <iframe id="padsheet"></iframe>
-    </div>
-</body>
-</html>
-```
-
-Reload the browser! The browser console should now print the following messages.
-
-![JavaScript Console Output](./images/successfully-loaded-pad-libraries.png)
-
-# 3. Configure the Pad
-
-Now that we loaded all the external libraries, we need to configure our pad. Therefore,
-create a new webstrate document (e.g., `/my-pad-configuration.js`) with the following html as content.
-This document defines the pad and all plugins added to the pad. We will later create a `MarkdownNote` plugin
-and add it also as a new plugin to the pad configuration.
-
-```html
-<html>
-<body>
-<pre id="webstrate">'use strict';
-
-const pad = new Pad.Manager();
-pad.addPlugin(new Pad.Plugins.CanvasObjectInteraction());
-pad.addPlugin(new Pad.Plugins.CanvasInteraction());
-pad.addPlugin(new Pad.Plugins.CanvasDrawing());
-pad.addPlugin(new Pad.Plugins.ImageBox());
-</pre>
-</body>
-</html>
-```
-
-Then edit the pad document and add a `<wscript>` to the `<head>` to load your pad configuration as
-an external webstrate. Replace `YOUR_PAD_CONFIGURATION_DOCUMENT_NAME` with the webstrate id of the
-document you just created in the previous step (e.g., `/my-pad-configuration.js`).
-
-```html
-<wscript type="webstrate/javascript" src="/YOUR_PAD_CONFIGURATION_DOCUMENT_NAME"></wscript>
-```
-
-## This is the complete `Pad Document` after step 3.
-
-```html
-<html>
-<head>
-    <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
-    <!-- Webstrates External Script/Stylesheet Bootstrap -->
-    <script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js"></script>
-
-    <wscript type="webstrate/javascript" src="/transformer-stable.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer-time.min.js"></wscript>
-
-    <!-- Pad Canvas Libraries -->
-    <wscript type="webstrate/javascript" src="/pad.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.manipulation-behavior.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-object-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-drawing.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.image-box.js"></wscript>
-
-    <!-- Pad Configuration -->
-    <wscript type="webstrate/javascript" src="/YOUR_PAD_CONFIGURATION_DOCUMENT_NAME"></wscript>
-
-    <style type="text/css">
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        #content {
-            width: 100%;
-            height: 100%;
-            display: -webkit-flex;
-            display: flex;
-        }
-
-        #content&gt;div {
-            margin: 20px;
-            width: 100%;
-            box-shadow:  0px 0px 15px black;
-            overflow: hidden;
-
-            /* svg does not work with border-radius. Therefore a padding of 2px to move svg 2px inwards. */
-            padding: 2px;
-            border-radius: 2px;
-
-            /* DEBUG COLOR */
-            background: orange;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            min-height: 100%;            
-            border: none;
-            overflow: hidden;
-
-            /* DEBUG COLOR */
-            background-color: saddlebrown;
-        }
-    </style>
-    <script type="text/javascript">
-        webstrate.on("loaded", function(webstrateId) {
-            const iframe = document.querySelector('#padsheet');
-
-            // Create a padsheet on first load named <webstrate>_sheet.
-            if (!iframe.src) {
-                iframe.src = '/' + webstrateId + '_sheet';
-            }
-        });
-    </script>
-</head>
-<body>
-    <div id="content">
-        <iframe id="padsheet"></iframe>
-    </div>
-</body>
-</html>
-```
-
-Reload the browser! The pad now has an add image button and a color picker. Try to draw on
-the canvas using an Apple iPad Pro and the Apple Pen. 
-
-![Basic Pad - Drawing](./images/basic-pad-drawing.png)
-
-Alternatively, add an image using the `Add image to canvas` button top left.
-
->**Attention:** After adding the image, you might need to zoom and pan a bit as the image
->will be added at `(0,0)` location of the canvas, which can be out of the current viewport.
-
-![Basic Pad - Image](./images/basic-pad-image.png)
-
-The `CanvasInteraction` and `CanvasObjectInteraction` plugins add panning, rotation, and zooming
-capabilities to the canvas and all objects added to the canvas.
-
-Interaction on a tablet:
-
-* Panning: Drag canvas/object to pan
-* Rotation: Rotate two fingers to rotate a canvas/object.
-* Zooming: Pinch canvas/object to zoom.
-
-Interaction on a computer:
-
-* Panning: Click and drag canvas/object to pan
-* Rotation: `Alt+` (on Windows) and `Option+` (on Mac OS) mousewheel to rotate a canvas/object.
-* Zooming: `Ctrl+` mousewheel to zoom canvas/object to zoom.
-
-# 4. Create a MarkdownNote plugin
-
-In this step, we create a markdown note plugin. The plugin will allow to add notes to the canvas
-and add markdown to notes, which will be transformed into html on focus lost.
-
-Create a new document with the following html (e.g., `/my-markdown-note-plugin.js`). The new
-plugin extends from the Pad plugin class. The Pad will call `onLoad` and `onUnload` when a
-plugin was loaded or respectively unloaded by the Pad. It also gives access to the Pad Manager
-instance through `this.manager`, which provides access to the padsheet `this.manager.sheetCanvas`
-the padsheet document `this.manager.sheetDocument` and padsheet window `this.manager.sheetWindow`.
-
-```html
-<html>
-<body>
-<pre id="webstrate">/**
- * The MarkdownNote plugin adds a functionality to the Pad and allows
- * adding notes to the canvas. A doubletap on the canvas will create a
- * new note at the tap location. Another doubletap on the note will switch
- * the note to a markdown editor view. The note can be edited in this view.
- * The markdown will be transformed into html markup when the focus of the note
- * is lost.
- * 
- * @class MarkdownNote
- * @extends {Pad.Plugin}
- */
-class MarkdownNote extends Pad.Plugin {
-
-    /**
-     * Creates an instance of MarkdownNote.
-     * 
-     * @memberOf MarkdownNote
-     */
-    constructor() {
-        // Do not forget to call super(), otherwise the plugin will not work.
-        super();
-    }
-
-    /**
-     * Called on plugin load. The pad manager instance is accessible through
-     * this.manager. The manager instance provides access to the sheet canvas,
-     * the sheet's document and window.
-     * 
-     * @memberOf MarkdownNote
-     */
-    onLoad() {
-
-        // Get the padsheet canvas (HTMLDivElement).
-        const canvas = this.manager.sheetCanvas;
-
-        // Get the padsheet document (HTMLDocument)
-        const documentBody = this.manager.sheetDocument.body;
-
-        // Make all markdown note elements already existing on the
-        // canvas interactive. This for example is the case on a browser
-        // reload.
-        const children = canvas.children;
-        const elements = Array.from(children);
-        elements.forEach(element =&gt; {
-            if (element.classList.contains('markdown-note')) {
-                this.makeMarkdownNoteInteractive(element);
-            }
-        });
-
-        // This callback will be called whenever a new markdown note was
-        // added (locally or remote) to the canvas. Make each note that was
-        // added to the canvas interactive.
-        canvas.webstrate.on("nodeAdded", (element, local) =&gt; {
-            if (element.classList.contains('markdown-note')) {
-                this.makeMarkdownNoteInteractive(element);
-            }
-        });
-
-        // Create a HammerManager (hammer.js) to listen to doubletap events on
-        // the document body. The doubletap events will later be used to add new
-        // markdown notes whenever the user doubletaps on the canvas.
-        this.hammerManager = new Hammer.Manager(documentBody);
-        this.hammerManager.add(new Hammer.Tap({ event: 'doubletap', taps: 2 }));
-
-        // Add callback function whenever a doubletap event happens on the document
-        // body.
-        this.hammerManager.on("doubletap", event =&gt; {
-
-            // When the event target is a markdown note or any of its children, then
-            // switch to markdown note edit mode.
-            if (event.target.closest('.markdown-note')) {
-                const element = event.target.closest('.markdown-note');
-                this.switchEditMode(element, true);
-                return;
-            }
-
-            // Ignore if event target is not document body or the canvas element. Only
-            // create new markdown notes when doubletap occured on the canvas or the
-            // document body.
-            if (event.target !== documentBody &amp;&amp; event.target !== canvas) {
-                return;
-            }
-
-            // The next part will work with the canvas transform to add the markdown note
-            // at the doubletap x/y position, to rotate it so the note is always in a '0'
-            // angle to the current viewport, and the note has always the same size and
-            // dependent on the current zoom factor.
-            const canvasTransforms = canvas.transforms;
-
-            // Convert the global doubletap point to the canvas local coordinates.
-            let point = new Transformer.Point(event.center.x, event.center.y);
-            point = canvasTransforms.fromGlobalToLocal(point)
-
-            const x = point.x;
-            const y = point.y;
-
-            // Adjust rotation of the note.
-            const angle = -canvasTransforms.rotateTransform.angle % 360;
-
-            // Adjust scaling of the note.
-            const scaleX = 1 / canvasTransforms.scaleTransform.x;
-            const scaleY = 1 / canvasTransforms.scaleTransform.y;
-
-            // Create a new note. This function will also add the note to the canvas.
-            const note = this.createMarkdownNote();
-
-            // Bind our Transformer API to the note element. The Transformer API allows
-            // setting translation, rotation, and scaling independent of the current transform
-            // of the canvas.
-            // ATTENTION: The `debug` flag adds the origin point X/Y and the transform origin indicator
-            // to the note element. Remove this in production!
-            Transformer.bindElement(note, null, /*debug*/ true)
-                .then(transformer =&gt; {
-
-                    // Finally set previously determined translate, rotate, and scale factors.
-                    transformer.transformOrigin.set(0.5, 0.5);
-                    transformer.translateTransform.set(x, y);
-                    transformer.rotateTransform.set(angle);
-                    transformer.scaleTransform.set(scaleX, scaleY);
-
-                    // Wait for the next animation frame to reapply the new transforms.
-                    window.requestAnimationFrame(() =&gt; {
-                        transformer.reapplyTransforms();
-                    });
-                });
-        });
-    }
-
-    /**
-     * Called on plugin unload. The pad manager instance is accessible through
-     * this.manager.
-     * 
-     * @memberOf MarkdownNote
-     */
-    onUnload() {
-
-        // Destroy HammerManager if exists.
-        if (this.hammerManager) {
-            this.hammerManager.destroy();
-        }
-    }
-
-    /**
-     * Make the markdown note interactive. Add a transient element, which will contain
-     * the transformed markdown into html. It is important to notice that only the markdown
-     * is synchronized by webstrate. The transformed html is added to a transient element
-     * and only available locally.
-     * 
-     * @param {any} element The html element with the .markdown-note class.
-     * 
-     * @memberOf MarkdownNote
-     */
-    makeMarkdownNoteInteractive(element) {
-
-        // Create transient element to add transient functionality. Thereby only relevant
-        // data is synchronized by Webstrates.
-        const transient = document.createElement("transient");
-
-        // Get element containing the actual markdown.
-        const input = element.querySelector('.markdown-input');
-
-        // Make the markdown input element editable (if not already).
-        input.setAttribute("contenteditable", true);
-
-        // Switch markdown note from edit mode to non-edit mode on blur.
-        input.addEventListener("blur", event =&gt; {
-            this.switchEditMode(element, false);
-        });
-
-        // Add a transient div holding the marked html content. Also transform the initial
-        // markdown to html and set it as new innerHTML. Then append the element containing
-        // the marked html to the transient element. 
-        const html = document.createElement("div");
-        html.setAttribute("class", "marked-html");
-        html.innerHTML = marked(input.innerText);
-        transient.appendChild(html);
-        element.appendChild(transient);
-
-        // WORKAROUND: In order to listen to changes in the markup, reapply them, and replace
-        // the content of the element holding the html, we use the attributeChanged event on the
-        // actual markdown note element. The editmode attribute will be triggered every time a user
-        // switches the note's editmode, which will be synchronized by Webstrates.
-        element.webstrate.on("attributeChanged", function(attributeName, oldValue, newValue, local) {
-            if (attributeName === "editmode") {
-                html.innerHTML = marked(input.innerText);
-            }
-        });
-
-    }
-
-    /**
-     * Switch the editmode of a note.
-     * 
-     * @param {any} element The actual markdown note element.
-     * @param {any} editable True if editable, false otherwise.
-     * 
-     * @memberOf MarkdownNote
-     */
-    switchEditMode(element, editable) {
-        element.setAttribute("editmode", `${editable}`);
-        if (editable) {
-            const input = element.querySelector('.markdown-input');
-            input.focus();
-        }
-    }
-
-    /**
-     * Create a new markdown note. The function also appends the new note to the canvas element and
-     * sets all required css class on the element.
-     * 
-     * @returns The new markdown note element.
-     * 
-     * @memberOf MarkdownNote
-     */
-    createMarkdownNote() {
-        const note = document.createElement("div");
-        note.setAttribute("class", "markdown-note");
-        note.setAttribute("editmode", "false");
-
-        const markdownInput = document.createElement("div");
-        markdownInput.setAttribute("class", "markdown-input");
-        note.appendChild(markdownInput);
-
-        this.manager.sheetCanvas.appendChild(note);
-
-        return note;
-    }
+Also, the tool-palette requires some CSS styling.
+
+```css
+#tool-palette {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 9999;
+    transition: opacity 250ms;
 }
 
-// Finally register the MarkdownNote pad plugin. This step is not necessary if the MarkdownNote
-// class is accessible in global scope. We will use the MarkdownNote class in a next step and add
-// this new functionality to the Pad.
-Pad.registerPlugin(MarkdownNote, "MarkdownNote");</pre>
-</body>
-</html>
+#tool-palette>div {
+    float: left;
+}
+
+#tool-palette .instrument-tool {
+    position: relative;
+    box-sizing: border-box;
+    width: 40px;
+    height: 40px;
+    border: 2px solid transparent;
+    border-radius: 5px;
+    margin-right: 5px;
+    font-size: 1.6em;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 1);
+}
 ```
 
-Load the new plugin by adding a `<wscript>` to the `Pad Document`. Replace `MY_MARKDOWN_NOTE_PLUGIN_DOCUMENT`
-with the id of your just created webstrate document. Also make sure to add the [marked](https://github.com/chjj/marked)
-library as dependency.
+# 3. Add drawing instrument
+
+In order to be able to draw on the pad, we add a drawing instrument with the following JavaScript.
+Add this script to the `head` right after `<!-- Add instrument scripts here -->`.
 
 ```html
-<wscript type="webstrate/javascript" src="/marked.min.js"></wscript>
-<wscript type="webstrate/javascript" src="/MY_MARKDOWN_NOTE_PLUGIN_DOCUMENT"></wscript>
+<!-- Drawing Instrument -->
+<script type="text/javascript" id="drawing-instrument">
+    webstrate.on("loaded", function() {;
+        (function() {
+
+            let svg;
+            let penColor = "black";
+
+            /**
+             * Calculates the mid-point between the two points A and B and then returns
+             * the mid-point.
+             * 
+             * @param {any} pointA The point A.
+             * @param {any} pointB The point B.
+             * @returns The mid-point between point A and point B.
+             */
+            const midPointBetween = (pointA, pointB) => {
+                return {
+                    x: pointA.x + (pointB.x - pointA.x) / 2,
+                    y: pointA.y + (pointB.y - pointA.y) / 2
+                };
+            }
+
+            /**
+             * Generates a path with regard to thickness of each point in path. This
+             * implementation was done by @clemens.
+             * 
+             * @param {any} points Path points with x- and y-position and a thickness per
+             * point.
+             * @returns The path as string.
+             */
+            const generatePath = (points) => {
+
+                const newPoints = [];
+                newPoints.push(points[0]);
+
+                for (let j = 1; j < points.length - 1; j++) {
+                    let p1 = points[j - 1];
+                    let p = points[j];
+                    let p2 = points[j + 1];
+                    let c = {
+                        x: p2.x - p1.x,
+                        y: p2.y - p1.y
+                    };
+                    let n = {
+                        x: -c.y,
+                        y: c.x
+                    };
+                    let len = Math.sqrt(n.x * n.x + n.y * n.y);
+                    if (len == 0) continue;
+                    let u = {
+                        x: n.x / len,
+                        y: n.y / len
+                    };
+
+                    newPoints.push({
+                        x: p.x + u.x * p.thickness,
+                        y: p.y + u.y * p.thickness
+                    });
+                }
+                newPoints.push(points[points.length - 1]);
+
+                for (let j = points.length - 2; j > 0; j--) {
+                    let p1 = points[j + 1];
+                    let p = points[j];
+                    let p2 = points[j - 1];
+                    let c = {
+                        x: p2.x - p1.x,
+                        y: p2.y - p1.y
+                    };
+                    let n = {
+                        x: -c.y,
+                        y: c.x
+                    };
+                    let len = Math.sqrt(n.x * n.x + n.y * n.y);
+                    if (len == 0) continue;
+                    let u = {
+                        x: n.x / len,
+                        y: n.y / len
+                    };
+
+                    newPoints.push({
+                        x: p.x + u.x * p.thickness,
+                        y: p.y + u.y * p.thickness
+                    });
+                }
+                let p1 = newPoints[0];
+                let p2 = newPoints[1];
+                let pathString = "M" + p1.x + " " + p1.y;
+                for (let j = 1; j < newPoints.length; j++) {
+                    let midPoint = midPointBetween(p1, p2);
+                    if (isNaN(p1.x) || isNaN(p1.y) || isNaN(midPoint.x) || isNaN(midPoint.y)) {
+                        console.log("NaN");
+                    }
+                    pathString = pathString += " Q " + p1.x + " " + p1.y + " " + midPoint.x + " " + midPoint.y;
+                    p1 = newPoints[j];
+                    p2 = newPoints[j + 1];
+                }
+
+                return pathString;
+            }
+
+            const onPenDown = (pen, points, path) => {
+                const { x, y, thickness } = pen;
+
+                const point = { x, y, thickness };
+                points.push(point);
+
+                path.setAttribute("d", generatePath(points));
+                path.setAttribute("fill", pen.color);
+
+                svg.appendChild(path);
+            }
+
+            const onPenMove = (pen, points, path) => {
+                const { x, y, thickness } = pen;
+
+                const point = { x, y, thickness };
+                points.push(point);
+
+                path.setAttribute("d", generatePath(points));
+            }
+
+            const createToolPalette = () => {
+
+                const toolPalette = document.querySelector('#tool-palette');
+
+                const drawingTools = document.createElement("div");
+                drawingTools.setAttribute("class", "drawing-instrument-tools");
+
+                const clearCanvas = document.createElement("div");
+                clearCanvas.setAttribute("class", "instrument-tool clear-drawing-canvas");
+                clearCanvas.addEventListener("touchstart", event => {
+                    Array.from(document.querySelectorAll("svg")).forEach(svg => {
+                        svg.remove();
+                    });
+                });
+                clearCanvas.addEventListener("click", event => {
+                    Array.from(document.querySelectorAll("svg")).forEach(svg => {
+                        svg.remove();
+                    });
+                });
+                drawingTools.appendChild(clearCanvas);
+
+                const colors = [
+                    "black",
+                    "white",
+                    "red",
+                    "green",
+                    "blue",
+                    "orange",
+                    "yellow"
+                ];
+
+                const colorsElement = document.createElement("ul");
+                colorsElement.setAttribute("class", "colors");
+                drawingTools.appendChild(colorsElement);
+
+                let activeColor;
+                colors.forEach((color, index) => {
+                    const colorElement = document.createElement("li");
+                    colorElement.setAttribute("class", "instrument-tool color");
+                    colorElement.style.background = color;
+                    colorsElement.appendChild(colorElement);
+
+                    colorElement.addEventListener("touchstart", event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+
+                        if (activeColor) {
+                            activeColor.removeAttribute("active");
+                        }
+
+                        colorElement.setAttribute("active", "true");
+                        activeColor = colorElement;
+
+                        penColor = color;
+                    }, true);
+
+                    if (index === 0) {
+                        penColor = color;
+                        colorElement.setAttribute("active", "true");
+                        activeColor = colorElement;
+                    }
+                });
+
+                let isVisible = true;
+                drawingTools.show = () => {
+                    drawingTools.style.opacity = 1.0;
+                    drawingTools.style.pointerEvents = "all";
+                    isVisible = true;
+                };
+
+                drawingTools.hide = () => {
+                    drawingTools.style.pointerEvents = "none";
+                    drawingTools.style.opacity = 0.0;
+                    isVisible = false;
+                };
+
+                drawingTools.isVisible = () => {
+                    return isVisible;
+                }
+
+                toolPalette.appendChild(drawingTools);
+
+                return drawingTools;
+            }
+            const toolPalette = createToolPalette();
+
+            const getPenPoint = (event, touch) => {
+                let transformable = event.target.closest('.transformable') || event.target.closest('.transformable-local');
+
+                // This is a hack and workaround because the outermost canvas uses the body as hammer target and therefore, we try
+                // to find the actual drawable.
+                if (!transformable) {
+                    transformable = event.target.querySelector('.transformable-local');
+                }
+
+                if (transformable) {
+                    let penPoint = new Transformer.Point(touch.clientX, touch.clientY);
+                    return transformable.transformer.fromGlobalToLocal(penPoint);
+                }
+                return {
+                    x: touch.clientX,
+                    y: touch.clientY
+                };
+            }
+
+            const getPenThickness = (event, force) => {
+                let transformable = event.target.closest('.transformable') || event.target.closest('.transformable-local');
+
+                // This is a hack and workaround because the outermost canvas uses the body as hammer target and therefore, we try
+                // to find the actual drawable.
+                if (!transformable) {
+                    transformable = event.target.querySelector('.transformable-local');
+                }
+
+                if (transformable) {
+                    const globalScale = transformable.transformer.globalScale;
+                    return (globalScale.x) * force * 3;
+                }
+
+                return force * 3;
+            }
+
+            const ns = "http://www.w3.org/2000/svg";
+            let path = null;
+            let points = [];
+            let timeout;
+
+            window.addEventListener("touchstart", event => {
+                if (event.touches.length !== 1) return;
+
+                let touch = event.touches[0];
+
+                if (touch.force === 0) return;
+
+                if (!toolPalette.isVisible()) {
+                    toolPalette.show();
+                    return;
+                }
+
+                if (event.target.closest('.instrument-tool')) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                if (timeout) {
+                    clearTimeout(timeout);
+                }
+                window.isManipulationEnabled = false;
+
+                let drawable = event.target.closest('.drawable');
+                if (!drawable) {
+                    drawable = event.target.querySelector('.drawable');
+                }
+                svg = drawable.querySelector(':scope>svg');
+
+                if (!svg) {
+                    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                    svg.setAttribute("xlink", "http://www.w3.org/1999/xlink");
+                    svg.setAttribute("xmlns:xlink", "");
+                    svg.setAttribute("class", "drawing-canvas")
+
+                    drawable.insertBefore(svg, drawable.firstElementChild);
+                }
+
+                path = document.createElementNS(ns, "path");
+                points.length = 0;
+
+                const pen = getPenPoint(event, touch);
+                pen.thickness = getPenThickness(event, touch.force);
+                pen.color = penColor ? penColor : "black";
+
+                onPenDown(pen, points, path);
+            }, true);
+
+            window.addEventListener("touchmove", event => {
+                if (event.touches.length !== 1) return;
+
+                let touch = event.touches[0];
+
+                if (touch.force === 0) return;
+
+                if (event.target.closest('.instrument-tool')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                const pen = getPenPoint(event, touch);
+                pen.thickness = getPenThickness(event, touch.force);
+                pen.color = penColor ? penColor : "black";
+
+                onPenMove(pen, points, path);
+            }, true);
+
+            // We will need this code later to avoid unintended manipulation of
+            // the pad. It works together with the manipulation instrument.
+            window.addEventListener("touchend", event => {
+                timeout = setTimeout(() => {
+                    window.isManipulationEnabled = true;
+                }, 250);
+            }, true);
+        })();
+    });
+</script>
 ```
 
-## This is the complete `Pad Document` after step 4.
+```css
+.drawing-instrument-tools .clear-drawing-canvas {
+    background: darkred;
+    float: right;
+    overflow: hidden;
+}
+
+.drawing-instrument-tools .clear-drawing-canvas:after {
+    color: white;
+    content: "clear";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate3d(-50%, -50%, 0);
+    font-family: 'Material Icons';
+    font-size: 1em;
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+
+.drawing-instrument-tools .colors {
+    list-style: none;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    float: right;
+}
+
+.drawing-instrument-tools .colors .color {
+    position: relative;
+    display: inline-block;
+    border-radius: 50% !important;
+}
+
+.drawing-instrument-tools .colors .color:after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: gray;
+    border-radius: 50%;
+    opacity: .5;
+}
+
+.drawing-instrument-tools .colors .color[active="true"] {
+    box-shadow: 0px 0px 1px rgba(0, 0, 0, .7);
+    border: 2px solid transparent;
+}
+
+.drawing-instrument-tools .colors .color[active="true"]:after {
+    opacity: 0.0;
+}
+```
+
+Add `drawable` class to `#canvas` to enable it for drawing.
+
+```html
+<body>
+    <div id="canvas" class="drawable"></div>
+</body>
+```
+
+## 3.1 Add Material Icons
+
+We use Google's Material Icons library for CSS icons. Add the following `<link>` element
+to the `<head>` of the document.
+
+```html
+<!-- Google Material Font -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"/>
+``` 
+
+Reload webstrate and try drawing on the pad. You can also change the `deepskyblue` background
+to `white` or `ghostwhite`.
+
+![Pad - Drawing](./images/pad-drawing.png)
+
+# 4. Add Panning, Rotation, and Scaling
+
+This tutorial relies on `hammer.js` and our `transformer.js` APIs. Add the following libraries
+to the `<head>` of the document and after the `Babel` script.
+
+```html
+<!-- Hammer.js API -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha256-eVNjHw5UeU0jUqPPpZHAkU1z4U+QFBBY488WvueTm88=" crossorigin="anonymous"></script>
+
+<!-- Transformer.js API -->
+<script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/transformer.js"></script>
+```
+
+Next, add the following manipulation instrument to the document and after the drawing instrument.
+
+```html
+<!-- Multi-Touch and Mouse Manipulation Instrument -->
+<script type="text/javascript" id="manipulation-instrument">
+    webstrate.on("loaded", function() {
+        console.debug(`transformer-example.js`);
+
+        ;
+        (function(exports) {
+
+            // Module object holding private variables.
+            const module = {};
+
+            // Prevent zooming on iOS >= 10
+            document.addEventListener('touchstart', function(event) {
+                if (event.touches.length > 1) {
+                    event.preventDefault();
+                }
+            }, false);
+
+            // Global variable to enable manipulation events when true and disable events when false.
+            window.isManipulationEnabled = true;
+
+            const doTransform = (obj, local = false) => {
+
+                let hammerTarget = obj;
+                // Use different element to listen for manipulation events when hammer-target attribute is
+                // set.
+                if (obj.hasAttribute("hammer-target")) {
+                    const targetSelector = obj.getAttribute("hammer-target");
+                    hammerTarget = document.querySelector(targetSelector) || obj;
+                }
+
+                let actionsContainer;
+
+                // Add actions to an element when actionable class is present.
+                if (obj.classList.contains("actionable")) {
+                    actionsContainer = document.createElement("transient");
+                    actionsContainer.setAttribute("class", "actions-container");
+
+                    const actions = document.createElement("ul");
+                    actions.setAttribute("class", "actions");
+                    actionsContainer.appendChild(actions);
+
+                    const clearCanvasAction = document.createElement("li");
+                    clearCanvasAction.setAttribute("class", "action clear-canvas-action");
+                    // deleteAction.innerHTML = `<i class="material-icons md-24">delete_forever</i>`
+                    clearCanvasAction.addEventListener("click", event => {
+                        const svg = obj.querySelector(':scope>svg');
+                        if (svg) {
+                            svg.remove();
+                        }
+                    });
+                    actions.appendChild(clearCanvasAction);
+
+                    const deleteAction = document.createElement("li");
+                    deleteAction.setAttribute("class", "action delete-action");
+                    // deleteAction.innerHTML = `<i class="material-icons md-24">delete_forever</i>`
+                    deleteAction.addEventListener("click", event => {
+                        obj.remove();
+                    });
+                    actions.appendChild(deleteAction);
+
+                    obj.appendChild(actionsContainer);
+                }
+
+                /**
+                    * Bring target to front by changing zIndex style property.
+                    */
+                function updateZ(target) {
+                    const transformables = document.querySelectorAll(".transformable");
+                    const currentZ = Number(target.style.zIndex);
+                    let maxZ = 1;
+                    for (var i = 0; i < transformables.length; i++) {
+                        maxZ = Number(transformables[i].style.zIndex) > maxZ ? Number(transformables[i].style.zIndex) : maxZ;
+                    }
+                    if (currentZ < maxZ) {
+                        target.style.zIndex = maxZ + 1;
+                    }
+                }
+
+                /**
+                    * In case of a transformable-local do not update element's transform in element style but update
+                    * its style as CSS style in the document head. The style is embedded in a transient tag element, so
+                    * it is ignored by Webstrates and not synchronized.
+                    */
+                let callback = null;
+                if (local) {
+                    const id = obj.id;
+
+                    if (!id) {
+                        throw Error(`A ".transformable-local" element needs an id to apply transforms locally.`);
+                    }
+
+                    const head = document.head;
+                    const transient = document.createElement("transient");
+                    const sheetStyle = document.createElement("style");
+                    transient.appendChild(sheetStyle);
+                    head.appendChild(transient);
+
+                    callback = (matrix) => {
+                        const cssTransform = matrix.toCss();
+
+                        sheetStyle.innerHTML = `
+#${id} {
+-webkit-transform: ${cssTransform};
+-moz-transform: ${cssTransform};
+-ms-transform: ${cssTransform};
+-o-transform: ${cssTransform};
+transform: ${cssTransform};
+}
+`;
+                    };
+                }
+
+                /**
+                    * Bind element to transformer API. Once the binding is complete, then create a hammer manager to receive
+                    * pan, rotate, and scale events. The transformer then manipulates the elements CSS transform style after
+                    * applying individual transform.
+                    */
+                Transformer.bindElement(obj, callback).then(transformer => {
+
+                    // // Alternatively, the transformer API binds the transformer object to the element.
+                    // const transformer = obj.transformer;
+
+                    const hammerManager = new Hammer.Manager(hammerTarget);
+
+                    // If hammer target is different from source, then do a bi-directional binding.
+                    // This will be used to identify the proper object to manipulate later in the
+                    // isValidEvent function (see further down).
+                    if (hammerTarget !== obj) {
+                        hammerTarget.hammerSource = obj;
+                        obj.hammerTarget = hammerTarget;
+                    }
+
+                    // Details on hammer.js can be found here: http://hammerjs.github.io
+                    hammerManager.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+                    hammerManager.add(new Hammer.Rotate({ threshold: 0 })).recognizeWith(hammerManager.get('pan'));
+                    hammerManager.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([hammerManager.get('pan'), hammerManager.get('rotate')]);
+
+                    // Create custom render transform for element.
+                    // !!! Changing any of this code or re-order will effect rendering of element after manipulation.
+                    const renderTransform = new Transformer.TransformGroup();
+                    const scaleTransform = obj.scaleTransform = new Transformer.ScaleTransform();
+                    const rotateTransform = obj.rotateTransform = new Transformer.RotateTransform();
+                    const translateTransform = obj.translateTransform = new Transformer.TranslateTransform();
+                    renderTransform.add(scaleTransform);
+                    renderTransform.add(rotateTransform);
+                    renderTransform.add(translateTransform);
+                    obj.renderTransform = renderTransform;
+
+                    // The center point, which is returned by hammer.js, is in screen coordinates. The following function
+                    // will transform these screen coordinates to canvas coordinates and with respect to an element's transform
+                    // and if necessary according to an element's transform hierarchy.
+                    const adjustCenterPoint = point => {
+                        let p = new Transformer.Point(point.x, point.y);
+                        return obj.transformer.fromGlobalToLocal(p);
+                    };
+
+                    // Temporary variables.
+                    let prevPoint = { x: 0, y: 0 };
+                    let prevScale = 1.0;
+                    let angleOffset = 0;
+                    let prevAngle = 0;
+
+                    // Actions attached to an object are scaled inverse to an element's transform hierarchy, so actions
+                    // are always rendered in the "same" size.
+                    const updateActionsScale = () => {
+
+                        // Update actions container scale based on global scale of object. Thereby the actions
+                        // do not grow or shrink with zooming.
+                        if (actionsContainer) {
+                            const scale = transformer.globalScale;
+                            actionsContainer.style.transform = `scale(${scale.x, scale.y})`;
+                        }
+                    }
+
+                    /**
+                        * Check if event is a valid event.
+                        * 
+                        * @param {any} event
+                        * @returns
+                        */
+                    const isValidEvent = (event) => {
+
+                        // Global variable to turn manipulation off or on, e.g., to turn it off while stylus
+                        // input and turn it on with a little delay to prevent jumping objects caused by the
+                        // resting palm on the screen.
+                        if (!window.isManipulationEnabled) {
+                            return false;
+                        }
+
+                        let closestTarget = event.target.closest('.transformable') || event.target.closest('.transformable-local');
+
+                        if (!closestTarget) {
+                            let parent = event.target;
+                            do {
+                                if (parent.hammerSource) {
+                                    closestTarget = parent.hammerSource;
+                                    break;
+                                }
+                            }
+                            while ((parent = parent.parentElement) !== null);
+                        }
+                        return closestTarget === obj;
+                    }
+
+                    // Consume event, so it does not get further propagated.
+                    const consumeEvent = (event) => {
+                        event.preventDefault();
+                        event.srcEvent.preventDefault();
+                        event.srcEvent.stopPropagation();
+                        event.srcEvent.stopImmediatePropagation();
+                    }
+
+                    // Register pan handler.
+                    hammerManager.on('panstart panmove panend', event => {
+
+                        if (!isValidEvent(event)) return;
+                        consumeEvent(event);
+
+                        if (event.type === "panstart") {
+                            updateZ(obj);
+                            updateActionsScale();
+
+                            if (event.maxPointers === 1) {
+                                prevPoint = { x: 0, y: 0 };
+                            }
+                            return;
+                        }
+
+                        // if (event.type.indexOf("end") > -1) {
+                        if (event.type === "panend" && event.isFinal) {
+                            prevPoint = { x: 0, y: 0 };
+                            transformer.complete();
+                            return;
+                        }
+
+                        let deltaPoint = new Transformer.Point(event.deltaX, event.deltaY);
+                        deltaPoint = transformer.fromGlobalToLocalDelta(deltaPoint);
+
+                        const newX = (translateTransform.x - prevPoint.x) + deltaPoint.x;
+                        const newY = (translateTransform.y - prevPoint.y) + deltaPoint.y;
+
+                        translateTransform.set(newX, newY);
+                        transformer.reapplyTransforms();
+
+                        prevPoint = {
+                            x: deltaPoint.x,
+                            y: deltaPoint.y
+                        };
+                    });
+
+                    // Register rotate handler.
+                    hammerManager.on("rotatestart rotatemove", event => {
+
+                        if (!isValidEvent(event)) return;
+                        consumeEvent(event);
+
+                        if (event.type === "rotatestart") {
+                            angleOffset = event.rotation;
+                            prevAngle = 0;
+
+                            let centerPoint = adjustCenterPoint(event.center);
+                            rotateTransform.centerPoint.x = centerPoint.x;
+                            rotateTransform.centerPoint.y = centerPoint.y;
+
+                            return;
+                        }
+
+                        // correct angle offset
+                        event.rotation -= angleOffset;
+
+                        const deltaAngle = (rotateTransform.angle - prevAngle) + event.rotation;
+
+                        prevAngle = event.rotation;
+
+                        rotateTransform.set(deltaAngle);
+                        transformer.reapplyTransforms();
+                    });
+
+                    // Register scale handler.
+                    hammerManager.on("pinchstart pinchmove", event => {
+
+                        if (!isValidEvent(event)) return;
+                        consumeEvent(event);
+
+                        if (event.type === "pinchstart") {
+                            prevScale = event.scale;
+
+                            let centerPoint = adjustCenterPoint(event.center);
+                            scaleTransform.centerPoint.x = centerPoint.x;
+                            scaleTransform.centerPoint.y = centerPoint.y;
+
+                            return;
+                        }
+
+                        const oldScale = scaleTransform.x;
+                        const scaleX = (scaleTransform.x / prevScale) * event.scale;
+                        const scaleY = (scaleTransform.y / prevScale) * event.scale;
+
+                        prevScale = event.scale;
+
+                        scaleTransform.set(scaleX, scaleY);
+                        transformer.reapplyTransforms();
+
+                        updateActionsScale();
+                    });
+
+                    let mouseManipulated = false;
+
+                    // This is a workaround to complete last transform started by a mousewheel interaction. 
+                    hammerTarget.addEventListener("mousemove", event => {
+
+                        if (mouseManipulated) {
+                            transformer.complete();
+                            mouseManipulated = false;
+                        }
+                    });
+
+                    // Also allow object manipulation using mousewheel interaction. Hold down the ctrl key to
+                    // scale an element and hold down the alt/option key to rotate an element.
+                    hammerTarget.addEventListener("mousewheel", event => {
+                        if (!event.ctrlKey && !event.altKey) return;
+
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+
+                        if (event.altKey) {
+                            mouseManipulated = true;
+
+                            const angle = (rotateTransform.angle - (event.wheelDelta / 10)) % 360;
+
+                            rotateTransform.set(angle);
+
+                            // Adjust translate transform to fit rotation point.
+                            let centerPoint = {
+                                x: event.clientX,
+                                y: event.clientY
+                            };
+                            centerPoint = adjustCenterPoint(centerPoint);
+                            rotateTransform.centerPoint.x = centerPoint.x;
+                            rotateTransform.centerPoint.y = centerPoint.y;
+
+                            transformer.reapplyTransforms();
+
+                        } else if (event.ctrlKey) {
+                            mouseManipulated = true;
+
+                            // Normalize wheel to +1 or -1.
+                            const wheel = event.wheelDelta / 120;
+
+                            // Compute zoom factor.
+                            const zoom = Math.exp(wheel * 0.02);
+                            const newScale = scaleTransform.x * zoom;
+
+                            scaleTransform.set(newScale, newScale);
+
+                            // Adjust translate transform to fit zoom point.
+                            let centerPoint = {
+                                x: event.clientX,
+                                y: event.clientY
+                            };
+                            centerPoint = adjustCenterPoint(centerPoint);
+                            scaleTransform.centerPoint.x = centerPoint.x;
+                            scaleTransform.centerPoint.y = centerPoint.y;
+
+                            transformer.reapplyTransforms();
+                        }
+                    }, false);
+                });
+            }
+
+            /**
+                * Enable manipulation on new nodes that are added to the DOM.
+                */
+            (function() {
+
+                const observerOptions = {
+                    childList: true,
+                    subtree: true
+                };
+
+                const observer = new MutationObserver(mutations => {
+
+                    mutations.forEach(mutation => {
+                        switch (mutation.type) {
+                            case "childList":
+
+                                Array.from(mutation.removedNodes).forEach(node => {
+                                    if (node.nodeType === 1 && node.transformer) {
+                                        node.transformer.destroy();
+                                    }
+                                });
+
+                                Array.from(mutation.addedNodes).forEach(node => {
+                                    if (node.nodeType === 1) {
+
+                                        if (!node.transformer && node.classList.contains("transformable")) {
+                                            doTransform(node);
+                                        }
+
+                                        Array.from(node.querySelectorAll('.transformable')).forEach(node => {
+                                            if (node.nodeType === 1 && !node.transformer) {
+                                                doTransform(node);
+                                            }
+                                        });
+                                    }
+                                });
+                                break;
+                        }
+                    });
+                });
+
+                observer.observe(document.body, observerOptions);
+            })();
+
+            // Enable manipulation on DOM nodes on page load.
+            Array.from(document.querySelectorAll('.transformable-local')).forEach(node => {
+                doTransform(node, true);
+            });
+
+            // Enable manipulation on DOM nodes on page load.
+            Array.from(document.querySelectorAll('.transformable')).forEach(node => {
+                doTransform(node);
+            });
+
+        }).call({}, window);
+    });
+</script>
+```
+
+Now, add the `transformable-local` class and a `hammer-target="body"` attribute to the `#canvas` element.
+The `hammer-target` is required since we will listen for manipulation events on the `body`, but transform
+the `#canvas` element instead.
+
+>**Tip:** Change a debug background color to the `#canvas` (e.g., `deepskyblue`) to understand why it is important
+to add the event listener to the body instead of the `#canvas` element. 
+
+![Pad - Manipulation](./images/pad-manipulation.png)
+
+# 5. Picture Instrument
+
+Last, we add a picture instrument. Add the following script to the document and after the
+manipulation instrument.
+
+```html
+<!-- Picture Instrument -->
+<script type="text/javascript" id="picture-instrument">
+    webstrate.on("loaded", function() {;
+        (function(exports) {
+
+            const onLoad = () => {
+                this.fileReader = new FileReader();
+                const imageTool = createDomNode();
+            }
+
+            const createDomNode = () => {
+                const toolPalette = document.querySelector('#tool-palette');
+
+                const pictureTools = document.createElement("div");
+                pictureTools.setAttribute("class", "picture-instrument-tools");
+
+                const inputWrapper = document.createElement("div");
+                inputWrapper.setAttribute("class", "instrument-tool add-picture-tool");
+
+                const label = document.createElement("label");
+                label.setAttribute("class", "input-button");
+                inputWrapper.appendChild(label);
+
+                this.input = document.createElement("input");
+                this.input.setAttribute("type", "file");
+                this.input.setAttribute("accept", "image/*");
+
+                this.input.addEventListener("change", event => {
+                    console.log('event %o', event);
+                    uploadImage();
+                });
+
+                label.appendChild(this.input);
+                pictureTools.appendChild(inputWrapper);
+
+                toolPalette.appendChild(pictureTools);
+
+                return pictureTools;
+            }
+
+            const uploadImage = () => {
+                const file = this.input.files[0];
+
+                console.log(file);
+
+                this.fileReader.onload = (file) => {
+                    processImage(file);
+                }
+
+                // Read in the image file as a data URL.
+                this.fileReader.readAsDataURL(file);
+            }
+
+            const processImage = (file) => {
+                const base64data = file.target.result;
+                const img = new Image();
+                let loaded = false;
+
+                img.addEventListener("load", () => {
+                    if (loaded) return;
+                    loaded = true;
+                    createImageWebstrate(img);
+                });
+                img.src = base64data;
+            }
+
+            const createImageWebstrate = (img) => {
+                let width = img.width;
+                let height = img.height;
+
+                const max = Math.max(width, height);
+                const min = Math.min(width, height);
+
+                // Resize image when to large.
+                if (max > 800) {
+
+                    let newWidth = width > height ? 400 : (min / max) * 400;
+                    let newHeight = height > width ? 400 : (min / max) * 400;
+                    width = newWidth;
+                    height = newHeight;
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+
+                    const ctx = canvas.getContext('2d');
+
+                    /// step 1 - resize to 50%
+                    const oc = document.createElement('canvas');
+                    const octx = oc.getContext('2d');
+
+                    oc.width = img.width * 0.5;
+                    oc.height = img.height * 0.5;
+                    octx.drawImage(img, 0, 0, oc.width, oc.height);
+
+                    /// step 2 - resize 50% of step 1
+                    octx.drawImage(oc, 0, 0, oc.width * 0.5, oc.height * 0.5);
+
+                    /// step 3, resize to final size
+                    ctx.drawImage(oc, 0, 0, oc.width * 0.5, oc.height * 0.5, 0, 0, canvas.width, canvas.height);
+
+                    img.src = canvas.toDataURL("image/png");
+                }
+
+                var boxDiv = document.createElement("div");
+                boxDiv.setAttribute("class", "transformable drawable actionable image-box");
+                boxDiv.style.left = "0px";
+                boxDiv.style.top = "0px";
+                boxDiv.style.width = `${width}px`;
+                boxDiv.style.height = `${height}px`;
+
+                const iframe = document.createElement("iframe");
+                window.webstrate.on("transcluded", (webstrateId) => {
+                    if (iframe.contentWindow) {
+                        const pathname = iframe.contentWindow.location.pathname;
+                        if (iframe.getAttribute("src") !== pathname) {
+                            iframe.src = pathname;
+                            return;
+                        }
+                        iframe.contentDocument.body.appendChild(img);
+                    }
+                });
+                boxDiv.appendChild(iframe);
+
+                const canvas = document.querySelector('#canvas');
+                canvas.appendChild(boxDiv);
+
+                iframe.src = "/new?prototype=pad-canvas-image";
+                iframe.style.pointerEvents = "none";
+
+                this.input.value = "";
+            }
+
+            onLoad();
+        }).call({}, window);
+    });
+</script>
+```
+
+Before the picuture instrument works you have to create the `pad-canvas-image` prototype, if not
+already exists. If it exists and does not match with the following webstrate content, then you have
+to change the prototype in the picture instrument. Search for `/new?prototype=pad-canvas-image` and
+replace `pad-canvas-image` with another `free` webstrate id and add the following content to the
+webstrate.
 
 ```html
 <html>
 <head>
-    <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
-    <!-- Webstrates External Script/Stylesheet Bootstrap -->
-    <script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js"></script>
-
-    <wscript type="webstrate/javascript" src="/transformer-stable.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer-time.min.js"></wscript>
-
-    <!-- Pad Canvas Libraries -->
-    <wscript type="webstrate/javascript" src="/pad.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.manipulation-behavior.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-object-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-drawing.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.image-box.js"></wscript>
-
-    <!-- Your Pad MarkdownNote Plugin -->
-    <wscript type="webstrate/javascript" src="/marked.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/MY_MARKDOWN_NOTE_PLUGIN_DOCUMENT"></wscript>
-
-    <!-- Pad Configuration -->
-    <wscript type="webstrate/javascript" src="/YOUR_PAD_CONFIGURATION_DOCUMENT_NAME"></wscript>
-
-    <style type="text/css">
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        #content {
-            width: 100%;
-            height: 100%;
-            display: -webkit-flex;
-            display: flex;
-        }
-
-        #content&gt;div {
-            margin: 20px;
-            width: 100%;
-            box-shadow:  0px 0px 15px black;
-            overflow: hidden;
-
-            /* svg does not work with border-radius. Therefore a padding of 2px to move svg 2px inwards. */
-            padding: 2px;
-            border-radius: 2px;
-
-            /* DEBUG COLOR */
-            background: orange;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            min-height: 100%;            
-            border: none;
-            overflow: hidden;
-
-            /* DEBUG COLOR */
-            background-color: saddlebrown;
-        }
-    </style>
-    <script type="text/javascript">
-        webstrate.on("loaded", function(webstrateId) {
-            const iframe = document.querySelector('#padsheet');
-
-            // Create a padsheet on first load named <webstrate>_sheet.
-            if (!iframe.src) {
-                iframe.src = '/' + webstrateId + '_sheet';
-            }
-        });
-    </script>
+	<style id="style-main">
+		html,
+		body,
+		img {
+			pointer-events: none;
+		}
+		
+		body {
+			margin: 0px;
+			overflow: hidden;
+			background-color: transparent;
+		}
+		
+		img {
+			width: 100%;
+			height: 100%;
+		}
+	</style>
 </head>
 <body>
-    <div id="content">
-        <iframe id="padsheet"></iframe>
-    </div>
 </body>
 </html>
 ```
 
-Adjust the pad configuration by adding the new `MarkdownNote` plugin.
+Add picture instrument CSS styling.
 
-```html
-<html>
-<body>
-<pre id="webstrate">'use strict';
+```css
+.picture-instrument-tools .add-picture-tool {
+    background: lightgray;
+}
 
-const pad = new Pad.Manager();
-pad.addPlugin(new Pad.Plugins.CanvasObjectInteraction());
-pad.addPlugin(new Pad.Plugins.CanvasInteraction());
-pad.addPlugin(new Pad.Plugins.CanvasDrawing());
-pad.addPlugin(new Pad.Plugins.ImageBox());
+.picture-instrument-tools input[type="file"] {
+    display: none;
+}
 
-// Add MarkdownNote Plugin. It will be accessible through Pad.Plugins since we register the
-// plugin in the previous step.
-pad.addPlugin(new Pad.Plugins.MarkdownNote());
-</pre>
-</body>
-</html>
+.picture-instrument-tools .input-button:before {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate3d(-50%, -50%, 0);
+    content: "add_a_photo";
+    font-family: 'Material Icons';
+    font-size: 1em;
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+
+.image-box iframe {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    pointer-events: none;
+}
+
+.actions-container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    -webkit-transition: opacity 250ms;
+    transition: opacity 250ms;
+    /* hide element -> This does not require to re-layout elements in contrast to display: none; */
+    opacity: 0;
+    pointer-events: none;
+}
+
+.actionable:hover .actions-container {
+    /* hide element -> This does not require to re-layout elements in contrast to display: none; */
+    opacity: 1.0;
+    pointer-events: unset;
+}
+
+.actions {
+    position: absolute;
+}
+
+.actions {
+    list-style: none;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+.actions li {
+    position: relative;
+    width: 1.2em;
+    height: 1.2em;
+    font-size: 3em;
+    border-radius: .2em;
+    background: white;
+    border: .05em solid black;
+    margin: 0 0 5px 5px;
+    font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+}
+
+.action:before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.delete-action:before {
+    color: darkred;
+    content: "delete_forever";
+}
+
+.clear-canvas-action:before {
+    content: "clear";
+}
 ```
 
-Reload the browser! A doubletap on the canvas creates a new markdown note. Doubletap a note (again)
-puts it in edit mode. Add some markdown and focus on another element (so it looses focus) to transform
-the markdown in html and switch from editmode in non-editmode.
-
-![Basic Pad - Markdown Notes](./images/markdown-notes.png)
-
->**Attention:** Sometimes, on an iOS devices the focus is not lost and therefore the markdown is not transformed
->into html.
-
-# 5. Change styling
-
-Go to Pad webstrate and remove DEBUG styling such as the `saddlebrown` background.
-
->Document after step 5.
-```html
-<html>
-<head>
-    <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
-    <!-- Webstrates External Script/Stylesheet Bootstrap -->
-    <script type="text/javascript" src="https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js"></script>
-
-    <wscript type="webstrate/javascript" src="/transformer-stable.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/hammer-time.min.js"></wscript>
-
-    <!-- Pad Canvas Libraries -->
-    <wscript type="webstrate/javascript" src="/pad.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.manipulation-behavior.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-object-interaction.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.canvas-drawing.js"></wscript>
-    <wscript type="webstrate/javascript" src="/pad.plugin.image-box.js"></wscript>
-
-    <!-- Your Pad MarkdownNote Plugin -->
-    <wscript type="webstrate/javascript" src="/marked.min.js"></wscript>
-    <wscript type="webstrate/javascript" src="/MY_MARKDOWN_NOTE_PLUGIN_DOCUMENT"></wscript>
-
-    <!-- Pad Configuration -->
-    <wscript type="webstrate/javascript" src="/YOUR_PAD_CONFIGURATION_DOCUMENT_NAME"></wscript>
-
-    <style type="text/css">
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        #content {
-            width: 100%;
-            height: 100%;
-            display: -webkit-flex;
-            display: flex;
-        }
-
-        #content > div {
-            margin: 20px;
-            width: 100%;
-            box-shadow:  0px 0px 15px black;
-            overflow: hidden;
-
-            /* svg does not work with border-radius. Therefore a padding of 2px to move svg 2px inwards. */
-            padding: 2px;
-            border-radius: 2px;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            min-height: 100%;            
-            border: none;
-            overflow: hidden;
-        }
-    </style>
-    <script type="text/javascript">
-        webstrate.on("loaded", function(webstrateId) {
-            const iframe = document.querySelector('#padsheet');
-
-            // Create a padsheet on first load named <webstrate>_sheet.
-            if (!iframe.src) {
-                iframe.src = '/' + webstrateId + '_sheet';
-            }
-        });
-    </script>
-</head>
-<body>
-    <div id="content">
-        <iframe id="padsheet"></iframe>
-    </div>
-</body>
-</html>
-```
-
-![Basic Pad - Change Styling](./images/pad-canvas-no-background.png)
+![Pad - Pictures](./images/pad-pictures.png)
 
 __That's it!__
 
