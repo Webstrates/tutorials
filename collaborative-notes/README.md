@@ -149,11 +149,11 @@ developer tools of the browser is tedious at best. To remedy this, two tools hav
 >on script and style nodes having id attributes. Note how ids have been added to all scripts and
 >styles in the examples above. This editor relies on transclusion of webstrates which is described
 >further below.
-> - [**Webstrates file system**](/Webstrates/file-system). An experimental file system. Simply clone
+> - [**Webstrates file system**](https://github.com/Webstrates/file-system). An experimental file system. Simply clone
 >the repository and run `node index.js --id=shared_notes`. Now a file `shared_notes` will have been
 >created in the `documents` folder. Open the file with your editor of choice. Any changes made to
 >`/shared_notes` will be propagated to the file and vice versa.
-> - [**Visual Studio Code extension**](/Webstrates/vsce). A Webstrates editor extension for
+> - [**Visual Studio Code extension**](https://github.com/Webstrates/vsce). A Webstrates editor extension for
 >Microsoft Visual Studio Code.
 
 Let's the code for dragging notes around. Replace the script with the following:
