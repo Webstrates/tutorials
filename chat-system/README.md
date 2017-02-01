@@ -37,7 +37,7 @@ webstrate.on("loaded", function(webstrateId, clientId, user) {
 
 	submitButton.addEventListener("click", function() {
 		chatWindow.insertAdjacentHTML('beforeend',
-			'<div class="entry">' + inputField.value + '</div>\n');
+			'<div class="chatEntry">' + inputField.value + '</div>\n');
 		inputField.value = "";
 	});
 });
@@ -99,14 +99,14 @@ body {
 	width: 100%;
 	border-bottom: 1px solid #eee;
 }
-#chatWindow .entry {
+#chatWindow .chatEntry {
 	p"ad"ding: 2px;
 }
-#chatWindow .entry .timestamp {
+#chatWindow .chatEntry .timestamp {
 	font-size: 80%;
 	color: #999;
 }
-#chatWindow .entry .username {
+#chatWindow .chatEntry .username {
 	display: inline-block;
 	width: 100px;
 	text-align: right;
