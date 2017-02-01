@@ -117,7 +117,7 @@ to a transient element instead.
 
 		function showDocument(docName) {
 			docIframe = document.createElement("iframe");
-			docIframe.setAttribute("src", webstrateId + "-" + docName);
+			docIframe.setAttribute("src", "/" + webstrateId + "-" + docName);
 			docIframe.setAttribute("id", "docIframe");
 			var docIframeTransient = document.createElement("transient");
 			docIframeTransient.appendChild(docIframe);
@@ -174,7 +174,7 @@ webstrate.on("loaded", function(webstrateId) {
 
 	function showDocument(docName) {
 		docIframe = document.createElement("iframe");
-		docIframe.setAttribute("src", webstrateId + "-" + docName);
+		docIframe.setAttribute("src",  "/" + webstrateId + "-" + docName);
 		docIframe.setAttribute("id", "docIframe");
 		var docIframeTransient = document.createElement("transient");
 		docIframeTransient.appendChild(docIframe);
@@ -277,7 +277,7 @@ webstrate.on("loaded", function(webstrateId) {
 
 	function showDocument(docName) {
 		docIframe = document.createElement("iframe");
-		docIframe.setAttribute("src", webstrateId + "-" + docName);
+		docIframe.setAttribute("src",  "/" + webstrateId + "-" + docName);
 		docIframe.setAttribute("id", "docIframe");
 		var docIframeTransient = document.createElement("transient");
 		docIframeTransient.appendChild(docIframe);
@@ -353,7 +353,7 @@ but then it'd also show up even before we chose a page. We don't like that.
 ```javascript
 function showDocument(docName) {
 	docIframe = document.createElement("iframe");
-	docIframe.setAttribute("src", webstrateId + "-" + docName);
+	docIframe.setAttribute("src",  "/" + webstrateId + "-" + docName);
 	docIframe.setAttribute("id", "docIframe");
 	var docIframeTransient = document.createElement("transient");
 	docIframeTransient.appendChild(docIframe);
