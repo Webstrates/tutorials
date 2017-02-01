@@ -183,8 +183,7 @@ webstrate.on("loaded", function() {
 		edited = null;
 	});
 
-	// On a mouse-down event, check if the target is a note, if so store it and its offset from the
-	mouse.
+	// On a mouse-down event, check if the target is a note, if so store it and its offset from the mouse.
 	document.addEventListener("mousedown", function(e) {
 		var target = e.target.closest(".note");
 		if (target===null) return;
@@ -195,8 +194,7 @@ webstrate.on("loaded", function() {
 		offset.y = e.clientY - parseInt(style.getPropertyValue("top"));
 	});
 
-	// On a mouse-move event, check if something is dragged, if so position it relative to the stored
-	offset.
+	// On a mouse-move event, check if something is dragged, if so position it relative to the stored offset.
 	document.addEventListener("mousemove", function(e) {
 		if (dragged === null) return;
 		if (edited) return;
