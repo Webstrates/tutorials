@@ -36,9 +36,9 @@ webstrate.on("loaded", function(webstrateId, clientId, user) {
 	var submitButton = document.getElementById("submitButton");
 
 	submitButton.addEventListener("click", function() {
-		inputField.value = "";
 		chatWindow.insertAdjacentHTML('beforeend',
 			'<div class="entry">' + inputField.value + '</div>\n');
+		inputField.value = "";
 	});
 });
 </script>
