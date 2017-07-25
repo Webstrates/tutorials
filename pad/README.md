@@ -1004,174 +1004,83 @@ manipulation instrument.
 ```html
 <!-- Picture Instrument -->
 <script type="text/javascript" id="picture-instrument">
-    webstrate.on("loaded", function() {;
-        (function(exports) {
+    webstrate.on("loaded", function() {
 
-            const onLoad = () => {
-                this.fileReader = new FileReader();
-                const imageTool = createDomNode();
-            }
+	const onLoad = () => {
+		const imageTool = createDomNode();
+	}
 
-            const createDomNode = () => {
-                const toolPalette = document.querySelector('#tool-palette');
+	const createDomNode = () => {
+		const toolPalette = document.querySelector('#tool-palette');
 
-                const pictureTools = document.createElement("div");
-                pictureTools.setAttribute("class", "picture-instrument-tools");
+		const pictureTools = document.createElement("div");
+		pictureTools.setAttribute("class", "picture-instrument-tools");
 
-                const inputWrapper = document.createElement("div");
-                inputWrapper.setAttribute("class", "instrument-tool add-picture-tool");
+		const inputWrapper = document.createElement("div");
+		inputWrapper.setAttribute("class", "instrument-tool add-picture-tool");
 
-                const label = document.createElement("label");
-                label.setAttribute("class", "input-button");
-                inputWrapper.appendChild(label);
+		const label = document.createElement("label");
+		label.setAttribute("class", "input-button");
+		inputWrapper.appendChild(label);
 
-                this.input = document.createElement("input");
-                this.input.setAttribute("type", "file");
-                this.input.setAttribute("accept", "image/*");
+		this.input = document.createElement("input");
+		this.input.setAttribute("type", "file");
+		this.input.setAttribute("accept", "image/*");
 
-                this.input.addEventListener("change", event => {
-                    console.log('event %o', event);
-                    uploadImage();
-                });
+		this.input.addEventListener("change", (event) => {
+			console.log('event %o', event);
+			
+			(async() => {
+				let asset = await uploadImages(this.input.files);
+				addImages(asset.fileName);
+			})();
+		});
 
-                label.appendChild(this.input);
-                pictureTools.appendChild(inputWrapper);
+		label.appendChild(this.input);
+		pictureTools.appendChild(inputWrapper);
 
-                toolPalette.appendChild(pictureTools);
+		toolPalette.appendChild(pictureTools);
 
-                return pictureTools;
-            }
+		return pictureTools;
+	}
 
-            const uploadImage = () => {
-                const file = this.input.files[0];
+	const uploadImages = (files) => {
+		return new Promise((resolve, reject) => {
+			
+			const file = files[0];
+			const formData = new FormData();
+			formData.append("file", file, file.name);
+			
+			const request = new XMLHttpRequest();
+			request.open("POST", window.location.pathname);
+			request.send(formData);
+			request.addEventListener("load", (e) => {
+				const asset = JSON.parse(request.responseText);
+				resolve(asset);
+			});
+		});
+	}
 
-                console.log(file);
+	const addImages = (imgSrc) => {
 
-                this.fileReader.onload = (file) => {
-                    processImage(file);
-                }
+		var boxDiv = document.createElement("div");
+		boxDiv.setAttribute("class", "transformable drawable actionable image-box");
+		boxDiv.style.left = "0px";
+		boxDiv.style.top = "0px";
 
-                // Read in the image file as a data URL.
-                this.fileReader.readAsDataURL(file);
-            }
+		const image = document.createElement("img");
+		image.setAttribute("src", imgSrc);
+		boxDiv.appendChild(image);
 
-            const processImage = (file) => {
-                const base64data = file.target.result;
-                const img = new Image();
-                let loaded = false;
+		const canvas = document.querySelector('#canvas');
+		canvas.appendChild(boxDiv);
 
-                img.addEventListener("load", () => {
-                    if (loaded) return;
-                    loaded = true;
-                    createImageWebstrate(img);
-                });
-                img.src = base64data;
-            }
+		this.input.value = "";
+	}
 
-            const createImageWebstrate = (img) => {
-                let width = img.width;
-                let height = img.height;
-
-                const max = Math.max(width, height);
-                const min = Math.min(width, height);
-
-                // Resize image when to large.
-                if (max > 800) {
-
-                    let newWidth = width > height ? 400 : (min / max) * 400;
-                    let newHeight = height > width ? 400 : (min / max) * 400;
-                    width = newWidth;
-                    height = newHeight;
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = newWidth;
-                    canvas.height = newHeight;
-
-                    const ctx = canvas.getContext('2d');
-
-                    /// step 1 - resize to 50%
-                    const oc = document.createElement('canvas');
-                    const octx = oc.getContext('2d');
-
-                    oc.width = img.width * 0.5;
-                    oc.height = img.height * 0.5;
-                    octx.drawImage(img, 0, 0, oc.width, oc.height);
-
-                    /// step 2 - resize 50% of step 1
-                    octx.drawImage(oc, 0, 0, oc.width * 0.5, oc.height * 0.5);
-
-                    /// step 3, resize to final size
-                    ctx.drawImage(oc, 0, 0, oc.width * 0.5, oc.height * 0.5, 0, 0, canvas.width, canvas.height);
-
-                    img.src = canvas.toDataURL("image/png");
-                }
-
-                var boxDiv = document.createElement("div");
-                boxDiv.setAttribute("class", "transformable drawable actionable image-box");
-                boxDiv.style.left = "0px";
-                boxDiv.style.top = "0px";
-                boxDiv.style.width = `${width}px`;
-                boxDiv.style.height = `${height}px`;
-
-                const iframe = document.createElement("iframe");
-                window.webstrate.on("transcluded", (webstrateId) => {
-                    if (iframe.contentWindow) {
-                        const pathname = iframe.contentWindow.location.pathname;
-                        if (iframe.getAttribute("src") !== pathname) {
-                            iframe.src = pathname;
-                            return;
-                        }
-                        iframe.contentDocument.body.appendChild(img);
-                    }
-                });
-                boxDiv.appendChild(iframe);
-
-                const canvas = document.querySelector('#canvas');
-                canvas.appendChild(boxDiv);
-
-                iframe.src = "/new?prototype=pad-canvas-image";
-                iframe.style.pointerEvents = "none";
-
-                this.input.value = "";
-            }
-
-            onLoad();
-        }).call({}, window);
-    });
+	onLoad();
+});
 </script>
-```
-
-Before the picuture instrument works you have to create the `pad-canvas-image` prototype, if not
-already exists. If it exists and does not match with the following webstrate content, then you have
-to change the prototype in the picture instrument. Search for `/new?prototype=pad-canvas-image` and
-replace `pad-canvas-image` with another `free` webstrate id and add the following content to the
-webstrate.
-
-```html
-<html>
-<head>
-	<style id="style-main">
-		html,
-		body,
-		img {
-			pointer-events: none;
-		}
-		
-		body {
-			margin: 0px;
-			overflow: hidden;
-			background-color: transparent;
-		}
-		
-		img {
-			width: 100%;
-			height: 100%;
-		}
-	</style>
-</head>
-<body>
-</body>
-</html>
 ```
 
 Add picture instrument CSS styling.
