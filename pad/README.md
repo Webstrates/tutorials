@@ -17,9 +17,6 @@ Babel is required to use ES6 together with WebKit devices.
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
-    <!-- Babel standalone, so external scripts are transformed to ES2015 compatible code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.18.1/babel.min.js" integrity="sha256-ytbyYjrh7reluPwZgVEBSe7b4TLcLzsUi54AxrF/dDw=" crossorigin="anonymous"></script>
-
     <style type="text/css">
         html,
         body {
