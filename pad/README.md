@@ -1029,7 +1029,7 @@ manipulation instrument.
 			
 			(async() => {
 				let asset = await uploadImages(this.input.files);
-				addImages(asset.fileName);
+				addImages(`${asset.v}/${asset.fileName}`);
 			})();
 		});
 
